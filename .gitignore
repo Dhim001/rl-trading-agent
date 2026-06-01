@@ -1,0 +1,55 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Virtual environments
+.venv/
+venv/
+.python-version
+
+# Environment files
+.env
+.env.*
+
+# Project artifacts
+data/cache/
+models/
+runs/
+paper/
+tuning/
+results/
+
+# Local databases and checkpoints
+*.db
+*.sqlite3
+*.ckpt
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build outputs
+build/
+dist/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / IDE files
+.DS_Store
+.idea/
+.vscode/
+.cursor/
