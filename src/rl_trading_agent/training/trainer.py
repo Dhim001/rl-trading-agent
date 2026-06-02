@@ -20,12 +20,12 @@ def split_train_test(
         symbols = sorted(data.keys())
         length = len(data[symbols[0]])
         split_idx = int(length * train_split)
-        train = {s: data[s].iloc[:split_idx].copy() for s in symbols}
-        test = {s: data[s].iloc[split_idx:].copy() for s in symbols}
+        train = {s: data[s].iloc[:split_idx] for s in symbols}
+        test = {s: data[s].iloc[split_idx:] for s in symbols}
         return train, test
 
     split_idx = int(len(data) * train_split)
-    return data.iloc[:split_idx].copy(), data.iloc[split_idx:].copy()
+    return data.iloc[:split_idx], data.iloc[split_idx:]
 
 
 def build_model(algorithm: str, env, training_cfg: dict[str, Any]):
