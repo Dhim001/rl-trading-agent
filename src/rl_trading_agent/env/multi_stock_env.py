@@ -30,13 +30,7 @@ class MultiStockTradingEnv(gym.Env):
     ) -> None:
         super().__init__()
         self.symbols = sorted(panel.keys())
-        self.panel = {s: panel[s].reset_index(drop=True) for s in self.symbols}
-        lengths = {s: len(df) for s, df in self.panel.items()}
-        if len(set(lengths.values())) != 1:
-            raise ValueError("All symbols must have the same number of aligned rows")
-
         self.n_symbols = len(self.symbols)
-        self._n_steps = lengths[self.symbols[0]]
         self.window_size = window_size
         self.initial_cash = initial_cash
         self.transaction_cost_pct = transaction_cost_pct
@@ -55,15 +49,9 @@ class MultiStockTradingEnv(gym.Env):
         self.action_space = spaces.MultiDiscrete([self.n_symbols, 3])
         self._obs_buffer = np.empty(self.observation_space.shape, dtype=np.float32)
         self._zero_obs = np.zeros(self.observation_space.shape, dtype=np.float32)
-
-        feature_blocks = []
-        close_columns = []
-        for symbol in self.symbols:
-            symbol_df = self.panel[symbol]
-            feature_blocks.append(symbol_df[FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True))
-            close_columns.append(symbol_df["Close"].to_numpy(dtype=np.float32, copy=True))
-        self._feature_matrix = np.concatenate(feature_blocks, axis=1)
-        self._close_prices = np.stack(close_columns, axis=1)
+        self._unrealized_buffer = np.zeros(self.n_symbols, dtype=np.float32)
+        self._tail_buffer = np.empty((3 * self.n_symbols + 2,), dtype=np.float32)
+        self.update_market_data(panel)
 
         self.current_step = window_size
         self.cash = initial_cash
@@ -73,6 +61,22 @@ class MultiStockTradingEnv(gym.Env):
 
     def _price(self, symbol_idx: int) -> float:
         return float(self._close_prices[self.current_step, symbol_idx])
+
+    def update_market_data(self, panel: dict[str, pd.DataFrame]) -> None:
+        self.panel = {s: panel[s].reset_index(drop=True) for s in self.symbols}
+        lengths = {s: len(df) for s, df in self.panel.items()}
+        if len(set(lengths.values())) != 1:
+            raise ValueError("All symbols must have the same number of aligned rows")
+        self._n_steps = lengths[self.symbols[0]]
+
+        feature_blocks = []
+        close_columns = []
+        for symbol in self.symbols:
+            symbol_df = self.panel[symbol]
+            feature_blocks.append(symbol_df[FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True))
+            close_columns.append(symbol_df["Close"].to_numpy(dtype=np.float32, copy=True))
+        self._feature_matrix = np.concatenate(feature_blocks, axis=1)
+        self._close_prices = np.stack(close_columns, axis=1)
 
     def _equity(self) -> float:
         holdings = float(np.dot(self.shares, self._close_prices[self.current_step]))
@@ -88,18 +92,19 @@ class MultiStockTradingEnv(gym.Env):
         position_values = self.shares.astype(np.float32) * prices
         position_ratios = position_values / denom
         cash_ratio = np.float32(self.cash / denom)
-        unrealized = np.zeros(self.n_symbols, dtype=np.float32)
+        self._unrealized_buffer.fill(0.0)
         has_position = self.shares > 0
-        unrealized[has_position] = (prices[has_position] - self.entry_prices[has_position]) / self.entry_prices[has_position]
+        self._unrealized_buffer[has_position] = (
+            (prices[has_position] - self.entry_prices[has_position]) / self.entry_prices[has_position]
+        )
 
-        tail = np.empty((3 * self.n_symbols + 2,), dtype=np.float32)
-        tail[0::3][:self.n_symbols] = cash_ratio
-        tail[1::3][:self.n_symbols] = position_ratios
-        tail[2::3][:self.n_symbols] = unrealized
-        tail[-2] = cash_ratio
-        tail[-1] = np.float32(1.0 - cash_ratio)
-        self._obs_buffer[:, self._feature_width:] = tail
-        return self._obs_buffer.copy()
+        self._tail_buffer[0::3][:self.n_symbols] = cash_ratio
+        self._tail_buffer[1::3][:self.n_symbols] = position_ratios
+        self._tail_buffer[2::3][:self.n_symbols] = self._unrealized_buffer
+        self._tail_buffer[-2] = cash_ratio
+        self._tail_buffer[-1] = np.float32(1.0 - cash_ratio)
+        self._obs_buffer[:, self._feature_width:] = self._tail_buffer
+        return self._obs_buffer
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
@@ -153,7 +158,7 @@ class MultiStockTradingEnv(gym.Env):
         if self.risk.trading_halted(equity):
             reward -= 0.01
 
-        obs = self._get_observation() if not terminated else self._zero_obs.copy()
+        obs = self._get_observation() if not terminated else self._zero_obs
         info = {
             "equity": equity,
             "cash": self.cash,

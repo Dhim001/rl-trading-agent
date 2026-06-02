@@ -9,6 +9,17 @@ import yfinance as yf
 NUMERIC_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
 
 
+def _normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
+    idx = pd.to_datetime(df.index, utc=True, errors="coerce")
+    valid = ~idx.isna()
+    if not bool(valid.all()):
+        df = df.loc[valid].copy()
+        idx = idx[valid]
+    df.index = idx.tz_convert("UTC").tz_localize(None).normalize()
+    df.index.name = "Date"
+    return df
+
+
 def download_market_data(
     symbol: str,
     start_date: str,
@@ -27,14 +38,14 @@ def download_market_data(
             usecols=["Date", *NUMERIC_COLUMNS],
             dtype={col: "float32" for col in NUMERIC_COLUMNS},
         )
-        return df.sort_index()
+        return _normalize_date_index(df).sort_index()
 
     ticker = yf.Ticker(symbol)
     df = ticker.history(start=start_date, end=end_date, auto_adjust=True)
     if df.empty:
         raise ValueError(f"No data returned for {symbol} between {start_date} and {end_date}")
 
-    df.index.name = "Date"
+    df = _normalize_date_index(df)
     df = df[NUMERIC_COLUMNS].dropna()
     df = df.astype({col: "float32" for col in NUMERIC_COLUMNS})
     df.to_csv(file_path)
