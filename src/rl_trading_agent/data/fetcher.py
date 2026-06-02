@@ -6,6 +6,9 @@ import pandas as pd
 import yfinance as yf
 
 
+NUMERIC_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
+
+
 def download_market_data(
     symbol: str,
     start_date: str,
@@ -17,7 +20,13 @@ def download_market_data(
     file_path = cache_path / f"{symbol}_{start_date}_{end_date}.csv"
 
     if file_path.exists():
-        df = pd.read_csv(file_path, parse_dates=["Date"], index_col="Date")
+        df = pd.read_csv(
+            file_path,
+            parse_dates=["Date"],
+            index_col="Date",
+            usecols=["Date", *NUMERIC_COLUMNS],
+            dtype={col: "float32" for col in NUMERIC_COLUMNS},
+        )
         return df.sort_index()
 
     ticker = yf.Ticker(symbol)
@@ -26,6 +35,7 @@ def download_market_data(
         raise ValueError(f"No data returned for {symbol} between {start_date} and {end_date}")
 
     df.index.name = "Date"
-    df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+    df = df[NUMERIC_COLUMNS].dropna()
+    df = df.astype({col: "float32" for col in NUMERIC_COLUMNS})
     df.to_csv(file_path)
     return df.sort_index()

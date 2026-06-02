@@ -31,6 +31,8 @@ class StockTradingEnv(gym.Env):
     ) -> None:
         super().__init__()
         self.df = df.reset_index(drop=True)
+        self._feature_matrix = self.df[FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True)
+        self._close_prices = self.df["Close"].to_numpy(dtype=np.float32, copy=True)
         self.window_size = window_size
         self.initial_cash = initial_cash
         self.transaction_cost_pct = transaction_cost_pct
@@ -45,6 +47,9 @@ class StockTradingEnv(gym.Env):
             dtype=np.float32,
         )
         self.action_space = spaces.Discrete(3)
+        self._feature_width = len(FEATURE_COLUMNS)
+        self._obs_buffer = np.empty(self.observation_space.shape, dtype=np.float32)
+        self._zero_obs = np.zeros(self.observation_space.shape, dtype=np.float32)
 
         self.current_step = window_size
         self.cash = initial_cash
@@ -53,7 +58,7 @@ class StockTradingEnv(gym.Env):
         self.equity_curve: list[float] = []
 
     def _price(self) -> float:
-        return float(self.df.loc[self.current_step, "Close"])
+        return float(self._close_prices[self.current_step])
 
     def _equity(self) -> float:
         return self.cash + self.shares * self._price()
@@ -72,9 +77,9 @@ class StockTradingEnv(gym.Env):
     def _get_observation(self) -> np.ndarray:
         start = self.current_step - self.window_size
         end = self.current_step
-        window = self.df.iloc[start:end][FEATURE_COLUMNS].to_numpy(dtype=np.float32)
-        portfolio = np.tile(self._portfolio_features(), (self.window_size, 1))
-        return np.concatenate([window, portfolio], axis=1)
+        self._obs_buffer[:, :self._feature_width] = self._feature_matrix[start:end]
+        self._obs_buffer[:, self._feature_width:] = self._portfolio_features()
+        return self._obs_buffer.copy()
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
@@ -124,7 +129,7 @@ class StockTradingEnv(gym.Env):
         if self.risk.trading_halted(equity):
             reward -= 0.01
 
-        obs = self._get_observation() if not terminated else np.zeros(self.observation_space.shape, dtype=np.float32)
+        obs = self._get_observation() if not terminated else self._zero_obs.copy()
         info = {"equity": equity, "cash": self.cash, "shares": self.shares, "step": self.current_step}
         return obs, float(reward), terminated, truncated, info
 
