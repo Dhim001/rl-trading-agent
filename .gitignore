@@ -22,6 +22,7 @@ venv/
 
 # Project artifacts
 data/cache/
+data/feature_stats.json
 models/
 runs/
 paper/

@@ -30,9 +30,6 @@ class StockTradingEnv(gym.Env):
         risk_limits: RiskLimits | None = None,
     ) -> None:
         super().__init__()
-        self.df = df.reset_index(drop=True)
-        self._feature_matrix = self.df[FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True)
-        self._close_prices = self.df["Close"].to_numpy(dtype=np.float32, copy=True)
         self.window_size = window_size
         self.initial_cash = initial_cash
         self.transaction_cost_pct = transaction_cost_pct
@@ -50,6 +47,7 @@ class StockTradingEnv(gym.Env):
         self._feature_width = len(FEATURE_COLUMNS)
         self._obs_buffer = np.empty(self.observation_space.shape, dtype=np.float32)
         self._zero_obs = np.zeros(self.observation_space.shape, dtype=np.float32)
+        self.update_market_data(df)
 
         self.current_step = window_size
         self.cash = initial_cash
@@ -59,6 +57,12 @@ class StockTradingEnv(gym.Env):
 
     def _price(self) -> float:
         return float(self._close_prices[self.current_step])
+
+    def update_market_data(self, df: pd.DataFrame) -> None:
+        self.df = df.reset_index(drop=True)
+        self._feature_matrix = self.df[FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True)
+        self._close_prices = self.df["Close"].to_numpy(dtype=np.float32, copy=True)
+        self._n_steps = len(self.df)
 
     def _equity(self) -> float:
         return self.cash + self.shares * self._price()
@@ -79,7 +83,7 @@ class StockTradingEnv(gym.Env):
         end = self.current_step
         self._obs_buffer[:, :self._feature_width] = self._feature_matrix[start:end]
         self._obs_buffer[:, self._feature_width:] = self._portfolio_features()
-        return self._obs_buffer.copy()
+        return self._obs_buffer
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
@@ -118,7 +122,7 @@ class StockTradingEnv(gym.Env):
             self.entry_price = 0.0
 
         self.current_step += 1
-        if self.current_step >= len(self.df) - 1:
+        if self.current_step >= self._n_steps - 1:
             terminated = True
 
         equity = self._equity()
@@ -129,7 +133,7 @@ class StockTradingEnv(gym.Env):
         if self.risk.trading_halted(equity):
             reward -= 0.01
 
-        obs = self._get_observation() if not terminated else self._zero_obs.copy()
+        obs = self._get_observation() if not terminated else self._zero_obs
         info = {"equity": equity, "cash": self.cash, "shares": self.shares, "step": self.current_step}
         return obs, float(reward), terminated, truncated, info
 
