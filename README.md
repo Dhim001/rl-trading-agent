@@ -20,6 +20,8 @@ Reinforcement learning framework for stock trading with data download, feature e
 - `src/rl_trading_agent/training/` - model training and tuning logic
 - `src/rl_trading_agent/evaluation/` - backtesting and metrics
 - `src/rl_trading_agent/paper/` - simulated live/paper-trading logic
+- `src/rl_trading_agent/dashboard/` - shared dashboard workflow contracts
+- `ui_dashboard/` - integrated Streamlit UI dashboard
 
 ## Requirements
 
@@ -47,7 +49,33 @@ pip install -e .
 
 # 3) Backtest the trained model
 .\.venv\Scripts\python.exe scripts\backtest.py
+
+# 4) Launch integrated UI dashboard
+.\.venv\Scripts\python.exe scripts\dashboard.py
 ```
+
+## One-Command Shortcuts (PowerShell)
+
+Use the integrated runner:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 dashboard
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 download
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 train
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 backtest
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 tune -Trials 10
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 paper-once
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1 paper-loop -MaxIterations 10
+```
+
+If you use VS Code, run predefined tasks from `Terminal -> Run Task`:
+- `RL: Dashboard`
+- `RL: Download Data`
+- `RL: Train`
+- `RL: Backtest`
+- `RL: Fine-tune`
+- `RL: Paper Trade Once`
+- `RL: Paper Trade Loop (10)`
 
 After training, the final model is saved to:
 

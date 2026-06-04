@@ -1,0 +1,11 @@
+streamlit>=1.36
+plotly>=5.22
+pandas>=2.0
+requests>=2.31
+websocket-client>=1.8
+psutil>=6.0
+reportlab>=4.2
+scikit-learn>=1.5
+shap>=0.46
+streamlit-sortables>=0.3
+redis>=5.0

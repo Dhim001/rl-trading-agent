@@ -51,6 +51,22 @@ dist/
 
 # OS / IDE files
 .DS_Store
+Thumbs.db
+Desktop.ini
 .idea/
 .vscode/
 .cursor/
+
+# Dashboard local files
+ui_dashboard/.streamlit/
+ui_dashboard/.cache/
+ui_dashboard/.runtime/
+
+# Local exports / runtime artifacts
+trade_history_export.csv
+trade_history_export.pdf
+*.pid
+
+# Local Redis files (if running Redis locally)
+dump.rdb
+appendonly.aof
