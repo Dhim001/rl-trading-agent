@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,19 @@ def run_hyperparameter_search(
         trial_training_cfg["save_freq"] = tuning_cfg["timesteps_per_trial"]
         trial_training_cfg["model_dir"] = str(study_dir / f"trial_{trial.number}" / "models")
         trial_training_cfg["log_dir"] = str(study_dir / f"trial_{trial.number}" / "runs")
+        trial_dir = study_dir / f"trial_{trial.number}"
+        trial_dir.mkdir(parents=True, exist_ok=True)
+        with open(trial_dir / "params.json", "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "learning_rate": trial_training_cfg["learning_rate"],
+                    "gamma": trial_training_cfg["gamma"],
+                    "batch_size": trial_training_cfg["batch_size"],
+                    "window_size": trial_env_cfg["window_size"],
+                },
+                f,
+                indent=2,
+            )
 
         model_path = train_agent(
             train_data=train_data,
@@ -74,7 +88,6 @@ def run_hyperparameter_search(
     study.optimize(objective, n_trials=tuning_cfg["n_trials"], show_progress_bar=True)
 
     best_path = study_dir / "best_params.json"
-    import json
 
     with open(best_path, "w", encoding="utf-8") as f:
         json.dump(study.best_params, f, indent=2)
