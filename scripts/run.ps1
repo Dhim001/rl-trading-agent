@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("dashboard", "download", "train", "backtest", "tune", "paper", "paper-once", "paper-loop")]
+    [ValidateSet("dashboard", "download", "train", "backtest", "tune", "paper", "paper-once", "paper-loop", "qa-dashboard")]
     [string]$Command,
 
     [int]$Port = 8501,
@@ -42,5 +42,8 @@ switch ($Command) {
     }
     "paper-loop" {
         & $python (Join-Path $root "scripts\paper_trade.py") --max-iterations $MaxIterations
+    }
+    "qa-dashboard" {
+        & $python (Join-Path $root "scripts\qa_dashboard.py")
     }
 }

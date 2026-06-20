@@ -32,8 +32,8 @@ def _render_banner(level: str, message: str) -> None:
 
 
 def render(project_root: Path, job_service: JobService) -> None:
-    st.subheader("Artifact Lineage")
-    st.caption("Trace data version -> model version -> backtest output, compare tuning params, and rollback model versions.")
+    st.subheader("Artifact Lineage and Rollback")
+    st.caption("Trace data-to-model-to-backtest relationships, compare trial parameter deltas, and restore prior model versions safely.")
 
     provenance_df = build_provenance(project_root)
     if provenance_df.empty:

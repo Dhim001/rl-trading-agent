@@ -16,6 +16,7 @@ from ui_dashboard.core.config import AppConfig
 from ui_dashboard.core.types import JobRecord
 from ui_dashboard.services.api_adapter import RemoteApiAdapter
 from rl_trading_agent.dashboard.workflows import WORKFLOW_COMMANDS, WORKFLOW_DEFINITIONS, WORKFLOW_LABELS
+from rl_trading_agent.storage import atomic_write_json, file_lock
 
 
 FINAL_STATUSES = {"completed", "failed", "stopped"}
@@ -58,13 +59,14 @@ class JobService:
     def _load_jobs_local(self) -> list[JobRecord]:
         if not self.config.jobs_db_path.exists():
             return []
-        with open(self.config.jobs_db_path, encoding="utf-8") as f:
-            rows = json.load(f)
+        with file_lock(self.config.jobs_db_path):
+            with open(self.config.jobs_db_path, encoding="utf-8") as f:
+                rows = json.load(f)
         return [JobRecord.from_dict(row) for row in rows]
 
     def _save_jobs_local(self, jobs: list[JobRecord]) -> None:
-        with open(self.config.jobs_db_path, "w", encoding="utf-8") as f:
-            json.dump([job.to_dict() for job in jobs], f, indent=2)
+        with file_lock(self.config.jobs_db_path):
+            atomic_write_json(self.config.jobs_db_path, [job.to_dict() for job in jobs])
 
     def _tasklist_running(self, pid: int) -> bool:
         completed = subprocess.run(

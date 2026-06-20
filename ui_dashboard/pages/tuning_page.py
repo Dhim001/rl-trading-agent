@@ -10,7 +10,8 @@ from ui_dashboard.services.data_service import discover_tuning_trials, load_equi
 
 
 def render(project_root: Path) -> None:
-    st.subheader("Fine-tuning (Optuna Trials)")
+    st.subheader("Fine-tuning Insights")
+    st.caption("Compare Optuna trials, inspect best hyperparameters, and drill into trial-level equity curves.")
     tuning_dir = project_root / "tuning"
     best_params_path = tuning_dir / "best_params.json"
     render_freshness_row([("Best Params Source", best_params_path)])

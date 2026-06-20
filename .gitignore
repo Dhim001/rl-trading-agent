@@ -28,6 +28,7 @@ runs/
 paper/
 tuning/
 results/
+artifacts/
 
 # Local databases and checkpoints
 *.db

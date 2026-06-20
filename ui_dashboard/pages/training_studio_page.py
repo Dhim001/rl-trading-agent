@@ -219,8 +219,7 @@ def _render_clone_and_retrain(project_root: Path, job_service: JobService) -> No
 def render(project_root: Path, job_service: JobService) -> None:
     st.subheader("Training Studio")
     st.caption(
-        "Plan, launch, monitor, and compare training runs with guided presets, progress telemetry, "
-        "checkpoint visibility, and clone/retrain workflows."
+        "Configure experiments, launch training jobs, track learning progress, and compare model runs with checkpoint and retraining tools."
     )
     base_cfg = load_default_config(project_root)
     _state_defaults(base_cfg)

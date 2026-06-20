@@ -296,8 +296,8 @@ def _render_paper_to_live_simulation(filtered_history: pd.DataFrame) -> None:
 
 
 def render(project_root: Path) -> None:
-    st.subheader("Trade Execution")
-    st.caption("Manual override trading controls, risk-aware order ticketing, pending order management, and what-if live execution analysis.")
+    st.subheader("Trade Execution Console")
+    st.caption("Place and supervise manual orders with risk checks, bulk upload tools, execution history, and paper-to-live what-if analysis.")
     risk_defaults = _load_risk_defaults(project_root)
 
     ui_components.render_component_guard(

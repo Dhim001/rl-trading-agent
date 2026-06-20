@@ -13,7 +13,8 @@ from ui_dashboard.services.realtime_service import read_websocket_event
 
 
 def render(project_root: Path) -> None:
-    st.subheader("Paper Trading")
+    st.subheader("Paper Trading Monitor")
+    st.caption("Track simulated live trading state, equity movement, and execution events with optional WebSocket updates.")
     state_path = project_root / "paper" / "portfolio_state.json"
     log_path = project_root / "paper" / "trades.log"
     render_freshness_row(
@@ -91,7 +92,11 @@ def render(project_root: Path) -> None:
     st.plotly_chart(fig, width="stretch")
 
     last_n = st.slider("Recent trade rows", min_value=5, max_value=200, value=20, key="paper_recent_rows")
-    st.dataframe(df.tail(last_n)[["timestamp", "equity", "cash", "action", "message"]], width="stretch")
+    preferred = ["timestamp", "equity", "cash", "action", "message"]
+    available = [c for c in preferred if c in df.columns]
+    if not available:
+        available = df.columns.tolist()[: min(6, len(df.columns))]
+    st.dataframe(df.tail(last_n)[available], width="stretch")
 
 
 if __name__ == "__main__":

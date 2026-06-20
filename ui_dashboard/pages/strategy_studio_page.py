@@ -265,8 +265,7 @@ def _load_dataset_bundle(project_root: Path):
 def render(project_root: Path, job_service: JobService) -> None:
     st.subheader("Strategy Studio")
     st.caption(
-        "Design indicator-driven strategies, run custom backtests, perform walk-forward validation, "
-        "inspect correlation/SHAP insights, and save reusable strategy presets."
+        "Build and iterate rule-based strategies with backtesting, walk-forward checks, indicator analytics, and reusable preset management."
     )
 
     cfg = load_project_config(project_root)

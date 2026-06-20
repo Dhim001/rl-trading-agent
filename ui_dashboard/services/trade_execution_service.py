@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from rl_trading_agent.storage import atomic_write_json, file_lock
 from ui_dashboard.services.data_service import load_json, load_jsonl
 
 
@@ -20,8 +21,9 @@ def load_pending_orders(project_root: Path) -> list[dict[str, Any]]:
     path = _runtime_orders_path(project_root)
     if not path.exists():
         return []
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
+    with file_lock(path):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
     if isinstance(data, list):
         return data
     return []
@@ -30,8 +32,8 @@ def load_pending_orders(project_root: Path) -> list[dict[str, Any]]:
 def save_pending_orders(project_root: Path, orders: list[dict[str, Any]]) -> None:
     path = _runtime_orders_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(orders, f, indent=2)
+    with file_lock(path):
+        atomic_write_json(path, orders)
 
 
 def create_order(
@@ -62,8 +64,18 @@ def create_order(
 def append_trade_log(project_root: Path, record: dict[str, Any]) -> None:
     path = project_root / "paper" / "trades.log"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record) + "\n")
+    with file_lock(path):
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    parquet_path = path.with_suffix(".parquet")
+    row_df = pd.DataFrame([record])
+    if parquet_path.exists():
+        try:
+            old = pd.read_parquet(parquet_path)
+            row_df = pd.concat([old, row_df], ignore_index=True)
+        except Exception:
+            pass
+    row_df.to_parquet(parquet_path, index=False)
 
 
 def execute_order(project_root: Path, order: dict[str, Any], execution_price: float | None = None) -> dict[str, Any]:
@@ -104,10 +116,29 @@ def cancel_order(order: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_trade_history(project_root: Path) -> pd.DataFrame:
-    rows = load_jsonl(project_root / "paper" / "trades.log")
-    if not rows:
+    json_rows = load_jsonl(project_root / "paper" / "trades.log")
+    parquet_path = project_root / "paper" / "trades.parquet"
+    parquet_df = pd.DataFrame()
+    if parquet_path.exists():
+        try:
+            parquet_df = pd.read_parquet(parquet_path)
+        except Exception:
+            parquet_df = pd.DataFrame()
+
+    if parquet_df.empty and not json_rows:
         return pd.DataFrame()
-    df = pd.DataFrame(rows)
+    json_df = pd.DataFrame(json_rows) if json_rows else pd.DataFrame()
+    if parquet_df.empty:
+        df = json_df
+    elif json_df.empty:
+        df = parquet_df
+    else:
+        df = pd.concat([parquet_df, json_df], ignore_index=True)
+        dedup_cols = [c for c in ["timestamp", "message", "symbol", "action"] if c in df.columns]
+        if dedup_cols:
+            df = df.drop_duplicates(subset=dedup_cols, keep="last")
+        else:
+            df = df.drop_duplicates(keep="last")
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     if "symbol" not in df.columns:

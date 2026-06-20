@@ -12,7 +12,8 @@ from ui_dashboard.services.data_service import human_size
 
 
 def render(project_root: Path) -> None:
-    st.subheader("Artifacts")
+    st.subheader("Artifact Explorer")
+    st.caption("Browse generated models, runs, tuning outputs, and paper/backtest files with size and recency visibility.")
     render_freshness_row(
         [
             ("Models", project_root / "models"),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import importlib
 import sys
 from datetime import datetime
@@ -7,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Ensure package imports work when launched as a Streamlit script path.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +35,7 @@ PAGES = {
     "Fine-tuning": "ui_dashboard.pages.tuning_page",
     "Paper Trading": "ui_dashboard.pages.paper_page",
     "Lineage": "ui_dashboard.pages.lineage_page",
+    "Metadata Registry": "ui_dashboard.pages.metadata_registry_page",
     "Operations Hub": "ui_dashboard.pages.operations_hub_page",
     "Artifacts": "ui_dashboard.pages.artifacts_page",
 }
@@ -46,6 +49,7 @@ PAGE_META: dict[str, dict[str, str]] = {
     "Paper Trading": {"group": "Execution", "icon": "📝", "desc": "Live paper-trading telemetry"},
     "Trade Execution": {"group": "Execution", "icon": "⚡", "desc": "Manual order overrides and audit"},
     "Lineage": {"group": "Operations", "icon": "🧬", "desc": "Artifact lineage and rollback"},
+    "Metadata Registry": {"group": "Operations", "icon": "🗃️", "desc": "SQLite run/artifact/lineage registry"},
     "Operations Hub": {"group": "Operations", "icon": "🛠️", "desc": "Run and manage workflows"},
     "Artifacts": {"group": "Operations", "icon": "📦", "desc": "Generated artifact inventory"},
 }
@@ -57,6 +61,98 @@ def _inject_sidebar_spacing_styles() -> None:
     st.markdown(
         """
         <style>
+        .skip-link {
+            position: absolute;
+            left: -9999px;
+            top: 0.5rem;
+            z-index: 99999;
+            background: #111;
+            color: #fff !important;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+        }
+        .skip-link:focus {
+            left: 0.75rem;
+        }
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+        html.a11y-strong-focus *:focus-visible {
+            outline: 3px solid #ffbf47 !important;
+            outline-offset: 2px !important;
+            border-radius: 4px;
+        }
+        body.a11y-high-contrast {
+            background: #000 !important;
+            color: #fff !important;
+        }
+        body.a11y-high-contrast [data-testid="stAppViewContainer"],
+        body.a11y-high-contrast [data-testid="stHeader"],
+        body.a11y-high-contrast [data-testid="stSidebar"] {
+            background: #000 !important;
+            color: #fff !important;
+        }
+        body.a11y-high-contrast button,
+        body.a11y-high-contrast input,
+        body.a11y-high-contrast select,
+        body.a11y-high-contrast textarea {
+            background: #000 !important;
+            color: #fff !important;
+            border: 2px solid #fff !important;
+        }
+        body.a11y-high-contrast a,
+        body.a11y-high-contrast p,
+        body.a11y-high-contrast span,
+        body.a11y-high-contrast label,
+        body.a11y-high-contrast div {
+            color: #fff !important;
+        }
+        body.a11y-high-contrast [data-testid="stMetricValue"],
+        body.a11y-high-contrast [data-testid="stMetricLabel"] {
+            color: #fff !important;
+        }
+        [data-testid="stAppViewContainer"] .main .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1.5rem;
+            max-width: 1360px;
+        }
+        [data-testid="stAppViewContainer"] .main h1 {
+            margin-bottom: 0.35rem;
+        }
+        [data-testid="stAppViewContainer"] .main [data-testid="stCaptionContainer"] {
+            margin-top: 0.1rem;
+            margin-bottom: 0.55rem;
+            line-height: 1.35;
+        }
+        [data-testid="stAppViewContainer"] .main [data-testid="stHorizontalBlock"] {
+            gap: 0.75rem;
+        }
+        [data-testid="stAppViewContainer"] .main [data-testid="stMetric"] {
+            padding-top: 0.15rem;
+            padding-bottom: 0.2rem;
+        }
+        [data-testid="stAppViewContainer"] .main [data-testid="stPlotlyChart"],
+        [data-testid="stAppViewContainer"] .main [data-testid="stDataFrame"] {
+            margin-top: 0.35rem;
+            margin-bottom: 0.35rem;
+        }
+        [data-testid="stAppViewContainer"] .main [data-testid="stExpander"] {
+            margin-top: 0.35rem;
+            margin-bottom: 0.35rem;
+        }
+        [data-testid="stAppViewContainer"] .main .stButton {
+            margin-top: 0.2rem;
+            margin-bottom: 0.2rem;
+        }
         [data-testid="stSidebar"] .block-container {
             padding-top: 0.8rem;
             padding-bottom: 1rem;
@@ -98,6 +194,104 @@ def _inject_sidebar_spacing_styles() -> None:
     )
 
 
+def _queue_accessibility_announcement(message: str) -> None:
+    if not st.session_state.get("a11y_screen_reader_announcements", True):
+        return
+    stamp = datetime.now().strftime("%H:%M:%S")
+    st.session_state["a11y_live_announcement"] = f"{stamp} - {message}"
+
+
+def _render_screen_reader_live_region() -> None:
+    if not st.session_state.get("a11y_screen_reader_announcements", True):
+        return
+    msg = str(st.session_state.get("a11y_live_announcement", "")).strip()
+    if not msg:
+        return
+    st.markdown(
+        f"<div class='sr-only' role='status' aria-live='polite' aria-atomic='true'>{html.escape(msg)}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _inject_accessibility_runtime() -> None:
+    high_contrast = "true" if st.session_state.get("a11y_high_contrast", False) else "false"
+    strong_focus = "true" if st.session_state.get("a11y_strong_focus", True) else "false"
+    script = """
+    <script>
+    (function () {
+      const root = window.parent && window.parent.document ? window.parent.document : document;
+      const body = root.body;
+      if (body) {
+        body.classList.toggle("a11y-high-contrast", __HIGH_CONTRAST__);
+      }
+      if (root.documentElement) {
+        root.documentElement.classList.toggle("a11y-strong-focus", __STRONG_FOCUS__);
+      }
+
+      const main = root.querySelector('[data-testid="stAppViewContainer"] .main');
+      if (main && !main.id) {
+        main.id = "main-content-anchor";
+      }
+
+      const selector = 'button, [role="button"], input, select, textarea, a[href]';
+      const deriveLabel = (el) => {
+        const title = (el.getAttribute("title") || "").trim();
+        const placeholder = (el.getAttribute("placeholder") || "").trim();
+        const ownText = ((el.innerText || el.textContent || "") + "").trim();
+        let widgetLabel = "";
+        const widgetRoot = el.closest('[data-testid="stWidget"], [data-testid="stButton"], [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-secondary"]');
+        if (widgetRoot) {
+          const labelNode = widgetRoot.querySelector('label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p');
+          if (labelNode) {
+            widgetLabel = ((labelNode.innerText || labelNode.textContent || "") + "").trim();
+          }
+        }
+        return widgetLabel || ownText || placeholder || title || "Interactive control";
+      };
+
+      const patchInteractiveA11y = () => {
+        const nodes = root.querySelectorAll(selector);
+        nodes.forEach((el) => {
+          if (el.hasAttribute("disabled") || el.getAttribute("aria-hidden") === "true") {
+            return;
+          }
+          if (!el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby")) {
+            el.setAttribute("aria-label", deriveLabel(el));
+          }
+          if (!el.hasAttribute("tabindex")) {
+            el.setAttribute("tabindex", "0");
+          }
+        });
+      };
+
+      patchInteractiveA11y();
+      if (!root.__rlA11yObserver) {
+        const observer = new MutationObserver(() => patchInteractiveA11y());
+        observer.observe(root.body, { childList: true, subtree: true });
+        root.__rlA11yObserver = observer;
+      }
+
+      if (!root.__rlEnterActivationHandler) {
+        root.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter") return;
+          const target = event.target;
+          if (!target) return;
+          const isNativeControl = ["BUTTON", "INPUT", "SELECT", "TEXTAREA", "A"].includes(target.tagName);
+          if (isNativeControl) return;
+          if (target.getAttribute("role") === "button") {
+            event.preventDefault();
+            target.click();
+          }
+        }, true);
+        root.__rlEnterActivationHandler = true;
+      }
+    })();
+    </script>
+    """
+    script = script.replace("__HIGH_CONTRAST__", high_contrast).replace("__STRONG_FOCUS__", strong_focus)
+    components.html(script, height=0, width=0)
+
+
 def _touch_recent_page(page_name: str) -> None:
     if page_name not in PAGES:
         return
@@ -128,6 +322,7 @@ def _render_navigation_menu() -> None:
         if quick != "(none)" and quick != st.session_state["selected_page"]:
             st.session_state["selected_page"] = quick
             _touch_recent_page(quick)
+            _queue_accessibility_announcement(f"Navigated to {quick}.")
             st.rerun()
 
     grouped: dict[str, list[str]] = {k: [] for k in PAGE_GROUP_ORDER}
@@ -158,6 +353,7 @@ def _render_navigation_menu() -> None:
                 ):
                     st.session_state["selected_page"] = page
                     _touch_recent_page(page)
+                    _queue_accessibility_announcement(f"Navigated to {page}.")
                     st.rerun()
                 if desc:
                     st.caption(desc)
@@ -198,6 +394,7 @@ def _track_job_completion_notifications(job_service: JobService) -> None:
             msg = f"{workflow} job {status}: {job_id}"
             st.toast(msg, icon="🔔")
             _push_notification("info", msg)
+            _queue_accessibility_announcement(msg)
     st.session_state["job_status_cache"] = new_cache
 
 
@@ -222,6 +419,7 @@ def _check_artifact_file_watcher(project_root: Path, rerun_on_change: bool = Fal
     msg = f"Artifact watcher detected changes: {sample}{overflow}"
     st.toast(msg, icon="📁")
     _push_notification("info", msg)
+    _queue_accessibility_announcement(msg)
     invalidate_dashboard_caches(changes)
     if rerun_on_change:
         st.rerun()
@@ -242,6 +440,10 @@ def _render_sidebar(job_service: JobService, project_root: Path) -> None:
     st.session_state.setdefault("artifact_watch_last_check_s", 0.0)
     st.session_state.setdefault("artifact_watch_interval_s", 20.0)
     st.session_state.setdefault("background_monitors_enabled", False)
+    st.session_state.setdefault("a11y_high_contrast", False)
+    st.session_state.setdefault("a11y_strong_focus", True)
+    st.session_state.setdefault("a11y_screen_reader_announcements", True)
+    st.session_state.setdefault("a11y_live_announcement", "")
 
     st.sidebar.header("Control Panel")
     st.sidebar.caption("Fast navigation and runtime controls")
@@ -279,6 +481,25 @@ def _render_sidebar(job_service: JobService, project_root: Path) -> None:
         help="Higher intervals reduce background overhead.",
     )
     _render_navigation_menu()
+
+    st.sidebar.markdown("<div class='sidebar-section-divider'></div>", unsafe_allow_html=True)
+    st.sidebar.markdown("### Accessibility")
+    st.session_state["a11y_high_contrast"] = st.sidebar.checkbox(
+        "High contrast mode",
+        value=st.session_state["a11y_high_contrast"],
+        help="Apply high-contrast colors across the dashboard.",
+    )
+    st.session_state["a11y_strong_focus"] = st.sidebar.checkbox(
+        "Strong focus indicators",
+        value=st.session_state["a11y_strong_focus"],
+        help="Show strong visible outlines while tabbing through controls.",
+    )
+    st.session_state["a11y_screen_reader_announcements"] = st.sidebar.checkbox(
+        "Screen reader announcements",
+        value=st.session_state["a11y_screen_reader_announcements"],
+        help="Announce page navigation and workflow status changes.",
+    )
+    st.sidebar.caption("Keyboard: use Tab / Shift+Tab to move, Enter to activate focused controls.")
 
     st.sidebar.markdown("<div class='sidebar-section-divider'></div>", unsafe_allow_html=True)
     st.sidebar.markdown("### Notification Center")
@@ -337,19 +558,24 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     _inject_sidebar_spacing_styles()
+    st.markdown("<a class='skip-link' href='#main-content-anchor'>Skip to main content</a>", unsafe_allow_html=True)
 
-    st.title("RL Trading Agent - UI Dashboard")
-    st.caption("Data-intensive control center for trading, training, fine-tuning, and artifact observability.")
-    st.caption(f"Project root: `{config.project_root}`")
+    st.title("RL Trading Agent Dashboard")
+    st.caption("Unified workspace for strategy research, model operations, execution oversight, and artifact observability.")
     if config.api_base_url:
         st.caption(f"Backend API mode enabled: `{config.api_base_url}`")
     else:
         st.caption("Backend API mode disabled: using local process adapter.")
 
     _render_sidebar(job_service, config.project_root)
+    _inject_accessibility_runtime()
+    _render_screen_reader_live_region()
 
     monitors_enabled = bool(st.session_state.get("background_monitors_enabled", False))
     selected_page = str(st.session_state.get("selected_page", "Overview"))
+    if st.session_state.get("a11y_last_page", "") != selected_page:
+        st.session_state["a11y_last_page"] = selected_page
+        _queue_accessibility_announcement(f"{selected_page} page loaded.")
 
     if monitors_enabled and selected_page in {"Overview", "Operations Hub"}:
         if hasattr(st, "fragment"):

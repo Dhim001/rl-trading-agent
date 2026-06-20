@@ -38,4 +38,7 @@ def summarize_backtest(equity_curve: list[float]) -> dict[str, float]:
 def save_equity_curve(equity_curve: list[float], path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"equity": equity_curve}).to_csv(path, index=False)
+    df = pd.DataFrame({"equity": equity_curve})
+    df.to_csv(path, index=False)
+    parquet_path = path.with_suffix(".parquet")
+    df.to_parquet(parquet_path, index=False)

@@ -98,7 +98,32 @@ def get_paper_state_cached(path: Path):
 @st.cache_data(ttl=300, show_spinner=False)
 def _load_paper_log_local(path_str: str, mtime_ns: int):
     _ = mtime_ns
-    return load_jsonl(Path(path_str))
+    path = Path(path_str)
+    json_rows = load_jsonl(path)
+    parquet_path = path.with_suffix(".parquet")
+    parquet_rows = []
+    if parquet_path.exists():
+        try:
+            import pandas as pd
+
+            df = pd.read_parquet(parquet_path)
+            parquet_rows = df.to_dict(orient="records")
+        except Exception:
+            parquet_rows = []
+    if not parquet_rows:
+        return json_rows
+    if not json_rows:
+        return parquet_rows
+
+    # Merge both sources to avoid truncation if one source lags.
+    merged = parquet_rows + json_rows
+    dedup: dict[tuple[str, str], dict] = {}
+    for row in merged:
+        key = (str(row.get("timestamp", "")), str(row.get("message", "")))
+        dedup[key] = row
+    rows = list(dedup.values())
+    rows.sort(key=lambda r: str(r.get("timestamp", "")))
+    return rows
 
 
 def get_paper_log_cached(path: Path):

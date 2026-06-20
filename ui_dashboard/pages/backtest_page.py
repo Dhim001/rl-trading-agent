@@ -11,7 +11,8 @@ from ui_dashboard.services.data_service import summarize_equity
 
 
 def render(project_root: Path) -> None:
-    st.subheader("Backtest")
+    st.subheader("Backtest Analytics")
+    st.caption("Evaluate strategy performance, drawdown risk, and equity trajectory from historical simulation results.")
     curve_path = project_root / "results" / "equity_curve.csv"
     render_freshness_row([("Backtest Equity Source", curve_path)])
 

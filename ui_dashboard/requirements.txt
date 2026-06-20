@@ -9,3 +9,4 @@ scikit-learn>=1.5
 shap>=0.46
 streamlit-sortables>=0.3
 redis>=5.0
+pyarrow>=17.0

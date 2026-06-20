@@ -183,7 +183,8 @@ def _render_recent_activity_quick_actions(project_root: Path) -> None:
 
 
 def render(project_root: Path) -> None:
-    st.subheader("Project Overview")
+    st.subheader("Executive Overview")
+    st.caption("Monitor portfolio health, model output trends, artifact freshness, and recent operational activity from one summary view.")
     model_dir = project_root / "models"
     runs_dir = project_root / "runs"
     tuning_dir = project_root / "tuning"

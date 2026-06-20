@@ -28,11 +28,20 @@ def download_market_data(
 ) -> pd.DataFrame:
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
-    file_path = cache_path / f"{symbol}_{start_date}_{end_date}.csv"
+    parquet_path = cache_path / f"{symbol}_{start_date}_{end_date}.parquet"
+    csv_path = cache_path / f"{symbol}_{start_date}_{end_date}.csv"
 
-    if file_path.exists():
+    if parquet_path.exists():
+        df = pd.read_parquet(parquet_path)
+        if "Date" in df.columns:
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+            df = df.set_index("Date")
+        df = df[NUMERIC_COLUMNS].astype({col: "float32" for col in NUMERIC_COLUMNS})
+        return _normalize_date_index(df).sort_index()
+
+    if csv_path.exists():
         df = pd.read_csv(
-            file_path,
+            csv_path,
             parse_dates=["Date"],
             index_col="Date",
             usecols=["Date", *NUMERIC_COLUMNS],
@@ -48,5 +57,8 @@ def download_market_data(
     df = _normalize_date_index(df)
     df = df[NUMERIC_COLUMNS].dropna()
     df = df.astype({col: "float32" for col in NUMERIC_COLUMNS})
-    df.to_csv(file_path)
+    write_df = df.reset_index()
+    write_df.to_parquet(parquet_path, index=False)
+    # Keep CSV for backward compatibility with older tooling.
+    df.to_csv(csv_path)
     return df.sort_index()

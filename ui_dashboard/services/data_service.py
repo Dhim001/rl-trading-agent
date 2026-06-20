@@ -32,9 +32,17 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def load_equity_curve(path: Path) -> pd.DataFrame | None:
-    if not path.exists():
-        return None
-    df = pd.read_csv(path)
+    candidate = path
+    if not candidate.exists():
+        parquet_candidate = path.with_suffix(".parquet")
+        if parquet_candidate.exists():
+            candidate = parquet_candidate
+        else:
+            return None
+    if candidate.suffix.lower() == ".parquet":
+        df = pd.read_parquet(candidate)
+    else:
+        df = pd.read_csv(candidate)
     if "equity" not in df.columns or df.empty:
         return None
     out = df.copy()
@@ -57,7 +65,9 @@ def summarize_equity(equity: pd.Series) -> dict[str, float]:
 
 def discover_tuning_trials(tuning_dir: Path) -> pd.DataFrame:
     records: list[dict[str, Any]] = []
-    for curve_path in sorted(tuning_dir.glob("trial_*/results/equity_curve.csv")):
+    paths = list(tuning_dir.glob("trial_*/results/equity_curve.csv"))
+    paths.extend(list(tuning_dir.glob("trial_*/results/equity_curve.parquet")))
+    for curve_path in sorted(paths):
         trial_name = curve_path.parents[1].name
         try:
             trial_num = int(trial_name.split("_")[-1])

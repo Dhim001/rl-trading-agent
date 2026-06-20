@@ -197,10 +197,9 @@ def _render_jobs_table(job_service: JobService, jobs: list[dict[str, Any]]) -> N
 
 def render(project_root: Path, job_service: JobService) -> None:
     _state_defaults()
-    st.subheader("Operations Hub")
+    st.subheader("Operations Control Center")
     st.caption(
-        "State-aware control center for training, trading, and fine-tuning workflows. "
-        "Actions are linked to project scripts and update job status in near real-time."
+        "Launch, monitor, and control training, trading, and tuning workflows with near real-time status, logs, and artifact validation."
     )
 
     poll_col1, poll_col2 = st.columns([2, 3])
